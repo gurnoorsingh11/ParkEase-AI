@@ -595,6 +595,8 @@ def smart_gate_entry(req: GateEntryRequest, db: Session = Depends(get_db)):
     ).first()
     if not supplied_pass or not req.pass_token or supplied_pass.token != req.pass_token:
         raise HTTPException(status_code=403, detail="A valid, active ParkEase parking-pass QR is required.")
+    if booking.payment_mode == "PREPAID" and booking.payment_status != "PAID":
+        raise HTTPException(status_code=402, detail="Payment must be verified before entry.")
     if booking.status == "ACTIVE_SESSION":
         raise HTTPException(status_code=400, detail="Duplicate Entry Rejected: An active session already exists for this pass.")
     if booking.status != "CONFIRMED":
