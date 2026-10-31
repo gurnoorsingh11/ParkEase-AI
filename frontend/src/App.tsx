@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import Analytics from './Analytics'
 
 import {
@@ -72,6 +72,9 @@ export default function App() {
   const [duration, setDuration] = useState(2)
   const [bookingBusy, setBookingBusy] = useState(false)
   const [bookingQrs, setBookingQrs] = useState<AnyObj>({})
+  const [scannerOpen, setScannerOpen] = useState(false)
+  const gateVideoRef = useRef<HTMLVideoElement | null>(null)
+  const [bookingQrs, setBookingQrs] = useState<AnyObj>({})
   const [qrBusy, setQrBusy] = useState('')
 
   const [gateRef, setGateRef] = useState('')
@@ -107,6 +110,69 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    if (!scannerOpen) return
+    let stream: MediaStream | null = null
+    let timer = 0
+    let active = true
+
+    const startScanner = async () => {
+      const BarcodeDetectorCtor = (window as any).BarcodeDetector
+      if (!BarcodeDetectorCtor) {
+        setNotice('QR camera scanning is not supported in this browser. Enter the pass token manually.')
+        setScannerOpen(false)
+        return
+      }
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setNotice('Camera access requires HTTPS or localhost. Enter the pass token manually.')
+        setScannerOpen(false)
+        return
+      }
+      const detector = new BarcodeDetectorCtor({ formats: ['qr_code'] })
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } })
+      if (!active) {
+        stream.getTracks().forEach(track => track.stop())
+        return
+      }
+      const video = gateVideoRef.current
+      if (!video) return
+      video.srcObject = stream
+      await video.play()
+      const scan = async () => {
+        if (!active) return
+        try {
+          const codes = await detector.detect(video)
+          const raw = codes?.[0]?.rawValue || ''
+          if (raw) {
+            const parts = raw.split('|')
+            if (parts[0] === 'PARKEASE' && parts[1] === 'PASS' && parts.length >= 4) {
+              setGateRef(parts[2])
+              setGatePassToken(parts.slice(3).join('|'))
+              setNotice('Parking pass QR recognised. Confirm the vehicle plate, then approve entry.')
+              setScannerOpen(false)
+              return
+            }
+            setNotice('This QR is not a valid ParkEase parking pass.')
+          }
+        } catch {
+          // Continue scanning while the camera is active.
+        }
+        timer = window.setTimeout(scan, 350)
+      }
+      scan()
+    }
+    startScanner().catch((e: any) => {
+      setNotice(e.message || 'Could not start the camera. Check browser permissions.')
+      setScannerOpen(false)
+    })
+    return () => {
+      active = false
+      if (timer) window.clearTimeout(timer)
+      stream?.getTracks().forEach(track => track.stop())
+      if (gateVideoRef.current) gateVideoRef.current.srcObject = null
+    }
+  }, [scannerOpen])
+
+  useEffect(() => {
     if (!notice) return
 
     const timer = window.setTimeout(() => setNotice(''), 4200)
@@ -131,6 +197,8 @@ export default function App() {
 
   const operator =
     (data.users || []).find((u: AnyObj) => u.role === 'OPERATOR')
+
+  const myBookings = bookings.filter(b => b.customer_id === customer?.id)
 
   const filteredFacilities = facilities.filter(f =>
     `${f.name} ${f.address}`.toLowerCase().includes(query.toLowerCase())
@@ -167,6 +235,17 @@ export default function App() {
       ]
 
   const go = (p: string) => setPage(p)
+
+  const loadBookingQrs = async (booking: AnyObj) => {
+    try {
+      const result = await api(
+        `/api/bookings/${encodeURIComponent(booking.id)}/qrs?customer_id=${encodeURIComponent(booking.customer_id)}`
+      )
+      setBookingQrs((current: AnyObj) => ({ ...current, [booking.id]: result }))
+    } catch (e: any) {
+      setNotice(e.message)
+    }
+  }
 
   const updateSlot = async (slot: AnyObj) => {
     const next =
@@ -702,7 +781,7 @@ export default function App() {
                   <div className="table-card">
                     <div className="table-head">
                       <b>Booking history</b>
-                      <span>{bookings.length} records</span>
+                      <span>{myBookings.length} records</span>
                     </div>
 
                     <div className="responsive-table">
@@ -767,7 +846,7 @@ export default function App() {
                           ))}
                         </tbody>
                       </table>
-                      {!bookings.length && (
+                      {!myBookings.length && (
                         <Empty text="No bookings yet. Find a parking bay to make your first reservation." />
                       )}
                     </div>
@@ -998,6 +1077,16 @@ export default function App() {
                         />
                       </label>
 
+                      <button className="secondary-button full" type="button" onClick={() => setScannerOpen(value => !value)}>
+                        <ScanLine size={16} /> {scannerOpen ? 'Stop QR scanner' : 'Scan parking pass QR'}
+                      </button>
+                      {scannerOpen && (
+                        <div style={{ margin: '12px 0' }}>
+                          <video ref={gateVideoRef} autoPlay muted playsInline style={{ width: '100%', maxHeight: 240, objectFit: 'cover', borderRadius: 12, background: '#111' }} />
+                          <small>Point the rear camera at the customer’s ParkEase pass QR code.</small>
+                        </div>
+                      )}
+
                       <label>
                         Parking pass token
                         <input
@@ -1109,10 +1198,11 @@ export default function App() {
                             <th>VEHICLE</th>
                             <th>AMOUNT</th>
                             <th>STATUS</th>
+                            <th>PASS / PAYMENT QR</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {bookings.map(b => (
+                          {myBookings.map(b => (
                             <tr key={b.id}>
                               <td className="ref">{b.booking_ref}</td>
                               <td>
@@ -1125,6 +1215,26 @@ export default function App() {
                               <td>{b.snapshot_plate}</td>
                               <td>{money(b.total_amount)}</td>
                               <td><Status value={b.status} /></td>
+                              <td>
+                                <button className="secondary-button" onClick={() => loadBookingQrs(b)} disabled={!['CONFIRMED', 'ACTIVE_SESSION', 'COMPLETED'].includes(b.status)}>
+                                  {bookingQrs[b.id] ? 'Refresh QR' : 'Show QR'}
+                                </button>
+                                {bookingQrs[b.id] && (
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 12 }}>
+                                    <div style={{ width: 132 }}>
+                                      <img src={bookingQrs[b.id].parking_qr_data} alt="Digital parking pass QR" style={{ width: 120, height: 120, objectFit: 'contain', background: '#fff', padding: 6, borderRadius: 8 }} />
+                                      <small>Parking pass</small>
+                                    </div>
+                                    {bookingQrs[b.id].payment_qr_data && (
+                                      <div style={{ width: 132 }}>
+                                        <img src={bookingQrs[b.id].payment_qr_data} alt="UPI payment QR" style={{ width: 120, height: 120, objectFit: 'contain', background: '#fff', padding: 6, borderRadius: 8 }} />
+                                        <small>Pay {money(bookingQrs[b.id].amount)} via UPI</small>
+                                      </div>
+                                    )}
+                                    <small style={{ flexBasis: '100%' }}>{bookingQrs[b.id].payment_note}</small>
+                                  </div>
+                                )}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
