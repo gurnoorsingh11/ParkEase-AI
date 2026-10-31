@@ -45,7 +45,7 @@ The seeded users and role switch are demo-only, not authentication. The app incl
 
 ## QR pass and UPI demo configuration
 
-The customer **My bookings** page can generate a digital parking-pass QR for confirmed and active bookings. The operator **Gate control** page can scan the QR with a supported browser camera, or accept the pass token manually. Camera access requires HTTPS (or localhost) and a browser that supports the BarcodeDetector API. The existing booking-reference/number-plate flow remains available as a demo fallback.
+The customer **My bookings** page can generate a digital parking-pass QR for confirmed and active bookings. The operator **Gate control** page can scan the QR with a supported browser camera, or accept the pass token manually. Camera access requires HTTPS (or localhost) and a browser that supports the BarcodeDetector API. Operators must still check the booking reference and registered number plate; a booking reference alone is not sufficient for gate entry.
 
 Set `UPI_ID` in the backend environment to enable a dynamic UPI intent QR with the booking amount and reference. The QR only pre-fills a payment in a UPI app; it does **not** prove that money was received. Do not mark a transaction paid based on a scan or a client-side redirect. With `PAYMENT_MODE=upi`, prepaid bookings remain unpaid until an operator checks the actual credit in their bank/UPI app and uses **Gate control → Manual UPI payment verification** to record the UTR. Entry remains blocked until that manual verification succeeds. This is a demo reconciliation flow, not a bank-integrated verification. A production payment flow needs a verified payment gateway/webhook and authenticated operator permissions.
 
