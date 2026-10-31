@@ -540,10 +540,13 @@ def get_booking_qrs(booking_id: str, customer_id: str, db: Session = Depends(get
         raise HTTPException(status_code=404, detail="Booking not found.")
     if booking.customer_id != customer_id:
         raise HTTPException(status_code=403, detail="This booking does not belong to the requested customer.")
-    if booking.status not in ["CONFIRMED", "ACTIVE_SESSION", "COMPLETED"]:
+    if booking.status not in ["CONFIRMED", "ACTIVE_SESSION"]:
         raise HTTPException(status_code=400, detail="A parking pass is available only for a confirmed booking.")
 
     parking_pass = db.query(ParkingPass).filter(ParkingPass.booking_id == booking.id).first()
+    if parking_pass and not parking_pass.active:
+        raise HTTPException(status_code=400, detail="This parking pass has already been used or deactivated.")
+
     if not parking_pass:
         parking_pass = ParkingPass(
             id=f"pass-{uuid.uuid4().hex[:10]}",
