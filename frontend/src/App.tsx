@@ -74,7 +74,6 @@ export default function App() {
   const [bookingQrs, setBookingQrs] = useState<AnyObj>({})
   const [scannerOpen, setScannerOpen] = useState(false)
   const gateVideoRef = useRef<HTMLVideoElement | null>(null)
-  const [bookingQrs, setBookingQrs] = useState<AnyObj>({})
   const [qrBusy, setQrBusy] = useState('')
 
   const [gateRef, setGateRef] = useState('')
@@ -235,17 +234,6 @@ export default function App() {
       ]
 
   const go = (p: string) => setPage(p)
-
-  const loadBookingQrs = async (booking: AnyObj) => {
-    try {
-      const result = await api(
-        `/api/bookings/${encodeURIComponent(booking.id)}/qrs?customer_id=${encodeURIComponent(booking.customer_id)}`
-      )
-      setBookingQrs((current: AnyObj) => ({ ...current, [booking.id]: result }))
-    } catch (e: any) {
-      setNotice(e.message)
-    }
-  }
 
   const updateSlot = async (slot: AnyObj) => {
     const next =
