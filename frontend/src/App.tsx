@@ -80,6 +80,9 @@ export default function App() {
   const [gatePassToken, setGatePassToken] = useState('')
   const [gatePlate, setGatePlate] = useState('')
   const [gateOverride, setGateOverride] = useState(false)
+  const [verifyRef, setVerifyRef] = useState('')
+  const [verifyUtr, setVerifyUtr] = useState('')
+  const [verifyBusy, setVerifyBusy] = useState(false)
 
   const refresh = async () => {
     setLoading(true)
@@ -356,6 +359,32 @@ export default function App() {
       await refresh()
     } catch (e: any) {
       setNotice(e.message)
+    }
+  }
+
+  const verifyManualPayment = async () => {
+    if (!verifyRef.trim() || !verifyUtr.trim()) {
+      setNotice('Enter the booking reference and UPI transaction reference.')
+      return
+    }
+    setVerifyBusy(true)
+    try {
+      const result = await api('/api/payments/manual-verify', {
+        method: 'POST',
+        body: JSON.stringify({
+          booking_ref: verifyRef.trim(),
+          transaction_reference: verifyUtr.trim(),
+          operator_note: 'Verified by operator against UPI/bank transaction history'
+        })
+      })
+      setNotice(result.message || 'Payment verified.')
+      setVerifyRef('')
+      setVerifyUtr('')
+      await refresh()
+    } catch (e: any) {
+      setNotice(e.message)
+    } finally {
+      setVerifyBusy(false)
     }
   }
 
@@ -1122,6 +1151,29 @@ export default function App() {
                         Process exit <ArrowUpRightFromSquare size={16} />
                       </button>
                     </div>
+                  </div>
+
+                  <div className="table-card" style={{ marginTop: 20, padding: 20 }}>
+                    <div className="table-head">
+                      <b>Manual UPI payment verification</b>
+                      <span>Operator check</span>
+                    </div>
+                    <p className="micro-note">
+                      Verify the actual credit in your bank or UPI app before confirming. A QR scan, screenshot or customer claim alone is not proof of payment.
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+                      <label>
+                        Booking reference
+                        <input value={verifyRef} onChange={e => setVerifyRef(e.target.value)} placeholder="e.g. PK-ELANTE-8821" />
+                      </label>
+                      <label>
+                        UPI transaction reference / UTR
+                        <input value={verifyUtr} onChange={e => setVerifyUtr(e.target.value)} placeholder="Enter bank/UPI reference" />
+                      </label>
+                    </div>
+                    <button className="primary-button" onClick={verifyManualPayment} disabled={verifyBusy}>
+                      {verifyBusy ? 'Verifying…' : 'Confirm verified payment'} <ShieldCheck size={16} />
+                    </button>
                   </div>
 
                   <div className="table-card">
