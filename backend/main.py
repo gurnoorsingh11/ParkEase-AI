@@ -581,7 +581,7 @@ def get_booking_qrs(booking_id: str, customer_id: str, db: Session = Depends(get
         "upi_uri": None,
         "payment_status": booking.payment_status,
         "amount": booking.total_amount,
-        "payment_note": "Payment is not verified by scanning a QR code."
+        "payment_note": "This booking is already marked PAID. No payment is due." if booking.payment_status == "PAID" else "Payment is not verified by scanning a QR code."
     }
 
     upi_id = os.getenv("UPI_ID", "").strip()
