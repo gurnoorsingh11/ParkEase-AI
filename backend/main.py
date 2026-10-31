@@ -608,6 +608,8 @@ def manual_verify_payment(req: ManualPaymentVerifyRequest, db: Session = Depends
         raise HTTPException(status_code=404, detail="Booking not found.")
     if booking.payment_status == "PAID":
         raise HTTPException(status_code=409, detail="This booking is already marked as paid.")
+    if booking.status not in ["CONFIRMED", "ACTIVE_SESSION"]:
+        raise HTTPException(status_code=400, detail="Payment can only be verified for a confirmed or active booking.")
 
     transaction_reference = req.transaction_reference.strip().upper()
     if len(transaction_reference) < 6 or len(transaction_reference) > 80:
