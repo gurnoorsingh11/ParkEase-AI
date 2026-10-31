@@ -1216,7 +1216,7 @@ export default function App() {
                               <td>{money(b.total_amount)}</td>
                               <td><Status value={b.status} /></td>
                               <td>
-                                <button className="secondary-button" onClick={() => loadBookingQrs(b)} disabled={!['CONFIRMED', 'ACTIVE_SESSION', 'COMPLETED'].includes(b.status)}>
+                                <button className="secondary-button" onClick={() => loadBookingQrs(b)} disabled={!['CONFIRMED', 'ACTIVE_SESSION'].includes(b.status)}>
                                   {bookingQrs[b.id] ? 'Refresh QR' : 'Show QR'}
                                 </button>
                                 {bookingQrs[b.id] && (
