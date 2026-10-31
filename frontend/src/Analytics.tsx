@@ -135,7 +135,9 @@ export default function Analytics({
       .reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
 
     return {
-      ...facility,
+      id: facility.id,
+      name: facility.name,
+      address: facility.address,
       total: facilitySlots.length,
       occupied,
       reserved,
