@@ -785,7 +785,7 @@ export default function App() {
                           </tr>
                         </thead>
                         <tbody>
-                          {bookings.map(b => (
+                          {myBookings.map(b => (
                             <tr key={b.id}>
                               <td>
                                 <b className="ref">{b.booking_ref}</b>
@@ -805,7 +805,7 @@ export default function App() {
                               </td>
                               <td><Status value={b.status} /></td>
                               <td>
-                                {['CONFIRMED', 'ACTIVE_SESSION', 'COMPLETED'].includes(b.status) ? (
+                                {['CONFIRMED', 'ACTIVE_SESSION'].includes(b.status) ? (
                                   <button className="text-button" disabled={qrBusy === b.id} onClick={() => loadBookingQrs(b)}>
                                     {qrBusy === b.id ? 'Loading…' : bookingQrs[b.id] ? 'Hide QR codes' : 'View QR codes'}
                                   </button>
@@ -1186,7 +1186,6 @@ export default function App() {
                             <th>VEHICLE</th>
                             <th>AMOUNT</th>
                             <th>STATUS</th>
-                            <th>PASS / PAYMENT QR</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1203,26 +1202,7 @@ export default function App() {
                               <td>{b.snapshot_plate}</td>
                               <td>{money(b.total_amount)}</td>
                               <td><Status value={b.status} /></td>
-                              <td>
-                                <button className="secondary-button" onClick={() => loadBookingQrs(b)} disabled={!['CONFIRMED', 'ACTIVE_SESSION'].includes(b.status)}>
-                                  {bookingQrs[b.id] ? 'Refresh QR' : 'Show QR'}
-                                </button>
-                                {bookingQrs[b.id] && (
-                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 12 }}>
-                                    <div style={{ width: 132 }}>
-                                      <img src={bookingQrs[b.id].parking_qr_data} alt="Digital parking pass QR" style={{ width: 120, height: 120, objectFit: 'contain', background: '#fff', padding: 6, borderRadius: 8 }} />
-                                      <small>Parking pass</small>
-                                    </div>
-                                    {bookingQrs[b.id].payment_qr_data && (
-                                      <div style={{ width: 132 }}>
-                                        <img src={bookingQrs[b.id].payment_qr_data} alt="UPI payment QR" style={{ width: 120, height: 120, objectFit: 'contain', background: '#fff', padding: 6, borderRadius: 8 }} />
-                                        <small>Pay {money(bookingQrs[b.id].amount)} via UPI</small>
-                                      </div>
-                                    )}
-                                    <small style={{ flexBasis: '100%' }}>{bookingQrs[b.id].payment_note}</small>
-                                  </div>
-                                )}
-                              </td>
+
                             </tr>
                           ))}
                         </tbody>
