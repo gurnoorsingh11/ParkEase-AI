@@ -495,17 +495,20 @@ def create_slot_hold(req: HoldRequest, db: Session = Depends(get_db)):
 @app.post("/api/bookings/confirm")
 def confirm_booking(req: ConfirmBookingRequest, db: Session = Depends(get_db)):
     cleanup_expired_holds(db)
-    existing_payment = db.query(Payment).filter(Payment.idempotency_key == req.idempotency_key).first()
     booking = db.query(Booking).filter(Booking.id == req.booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found.")
+    existing_payment = db.query(Payment).filter(
+        Payment.idempotency_key == req.idempotency_key,
+        Payment.booking_id == booking.id
+    ).first()
     if existing_payment:
         return {"booking": booking, "payment": existing_payment, "idempotent_replay": True}
 
     if booking.status == "EXPIRED":
         raise HTTPException(status_code=400, detail="Temporary slot hold expired. Please select a slot again.")
 
-    if booking.payment_mode == "PREPAID":
+    if booking.payment_mode == "PREPAID" and os.getenv("PAYMENT_MODE", "demo").lower() != "upi":
         payment = Payment(
             id=f"pay-{uuid.uuid4().hex[:8]}",
             booking_id=booking.id,
@@ -586,14 +589,12 @@ def smart_gate_entry(req: GateEntryRequest, db: Session = Depends(get_db)):
     booking = db.query(Booking).filter(Booking.booking_ref == req.booking_ref).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Invalid QR / Booking Reference.")
-    if req.pass_token:
-        supplied_pass = db.query(ParkingPass).filter(
-            ParkingPass.booking_id == booking.id,
-            ParkingPass.token == req.pass_token,
-            ParkingPass.active == True
-        ).first()
-        if not supplied_pass:
-            raise HTTPException(status_code=403, detail="Invalid or inactive parking pass QR.")
+    supplied_pass = db.query(ParkingPass).filter(
+        ParkingPass.booking_id == booking.id,
+        ParkingPass.active == True
+    ).first()
+    if not supplied_pass or not req.pass_token or supplied_pass.token != req.pass_token:
+        raise HTTPException(status_code=403, detail="A valid, active ParkEase parking-pass QR is required.")
     if booking.status == "ACTIVE_SESSION":
         raise HTTPException(status_code=400, detail="Duplicate Entry Rejected: An active session already exists for this pass.")
     if booking.status != "CONFIRMED":
