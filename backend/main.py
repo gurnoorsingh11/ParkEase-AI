@@ -5,6 +5,9 @@ import base64
 import io
 import secrets
 import hashlib
+from dotenv import load_dotenv
+
+load_dotenv()
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Header
