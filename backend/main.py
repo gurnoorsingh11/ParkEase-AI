@@ -555,7 +555,7 @@ def get_booking_qrs(booking_id: str, customer_id: str, db: Session = Depends(get
         db.commit()
         db.refresh(parking_pass)
 
-    parking_payload = f"PARKEASE|PASS|{parking_pass.token}"
+    parking_payload = f"PARKEASE|PASS|{booking.booking_ref}|{parking_pass.token}"
     result = {
         "booking_id": booking.id,
         "booking_ref": booking.booking_ref,
