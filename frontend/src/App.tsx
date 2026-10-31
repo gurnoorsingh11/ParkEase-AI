@@ -71,8 +71,11 @@ export default function App() {
   const [selectedSlot, setSelectedSlot] = useState('')
   const [duration, setDuration] = useState(2)
   const [bookingBusy, setBookingBusy] = useState(false)
+  const [bookingQrs, setBookingQrs] = useState<AnyObj>({})
+  const [qrBusy, setQrBusy] = useState('')
 
   const [gateRef, setGateRef] = useState('')
+  const [gatePassToken, setGatePassToken] = useState('')
   const [gatePlate, setGatePlate] = useState('')
   const [gateOverride, setGateOverride] = useState(false)
 
@@ -229,6 +232,24 @@ export default function App() {
     }
   }
 
+  const loadBookingQrs = async (booking: AnyObj) => {
+    if (bookingQrs[booking.id]) {
+      setBookingQrs((current: AnyObj) => ({ ...current, [booking.id]: null }))
+      return
+    }
+    setQrBusy(booking.id)
+    try {
+      const result = await api(
+        `/api/bookings/${encodeURIComponent(booking.id)}/qrs?customer_id=${encodeURIComponent(customer?.id || '')}`
+      )
+      setBookingQrs((current: AnyObj) => ({ ...current, [booking.id]: result }))
+    } catch (e: any) {
+      setNotice(e.message || 'Could not load booking QR codes.')
+    } finally {
+      setQrBusy('')
+    }
+  }
+
   const gateAction = async (action: 'entry' | 'exit') => {
     if (!gateRef.trim()) {
       setNotice('Enter a booking reference.')
@@ -242,6 +263,7 @@ export default function App() {
           body: JSON.stringify({
             booking_ref: gateRef.trim(),
             presented_plate: gatePlate.trim(),
+            pass_token: gatePassToken.trim() || null,
             operator_override: gateOverride,
             override_note: gateOverride
               ? 'Manual operator verification in demo'
@@ -250,6 +272,7 @@ export default function App() {
         })
 
         setNotice('Gate entry approved. Parking session is now active.')
+        setGatePassToken('')
       } else {
         await api('/api/sessions/exit', {
           method: 'POST',
@@ -691,6 +714,7 @@ export default function App() {
                             <th>VEHICLE</th>
                             <th>AMOUNT</th>
                             <th>STATUS</th>
+                            <th>DIGITAL PASS</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -713,6 +737,32 @@ export default function App() {
                                 <small>{titleCase(b.payment_status)}</small>
                               </td>
                               <td><Status value={b.status} /></td>
+                              <td>
+                                {['CONFIRMED', 'ACTIVE_SESSION', 'COMPLETED'].includes(b.status) ? (
+                                  <button className="text-button" disabled={qrBusy === b.id} onClick={() => loadBookingQrs(b)}>
+                                    {qrBusy === b.id ? 'Loading…' : bookingQrs[b.id] ? 'Hide QR codes' : 'View QR codes'}
+                                  </button>
+                                ) : <small>Available after confirmation</small>}
+                                {bookingQrs[b.id] && (
+                                  <div className="booking-qr-panel">
+                                    <div className="booking-qr-item">
+                                      <b>Parking pass</b>
+                                      <img src={bookingQrs[b.id].parking_qr_data} alt="Secure ParkEase parking pass QR code" />
+                                      <small>Show this at the entry gate. Keep it private.</small>
+                                    </div>
+                                    {bookingQrs[b.id].payment_qr_data ? (
+                                      <div className="booking-qr-item">
+                                        <b>UPI payment · {money(bookingQrs[b.id].amount)}</b>
+                                        <img src={bookingQrs[b.id].payment_qr_data} alt="UPI payment QR code" />
+                                        <small>Scan in a UPI app and approve payment. ParkEase does not verify payment from the scan alone.</small>
+                                        <a href={bookingQrs[b.id].upi_uri}>Open UPI app</a>
+                                      </div>
+                                    ) : (
+                                      <div className="booking-qr-note">{bookingQrs[b.id].payment_note || 'Payment QR unavailable.'}</div>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -945,6 +995,15 @@ export default function App() {
                           value={gatePlate}
                           onChange={e => setGatePlate(e.target.value.toUpperCase())}
                           placeholder="e.g. CH01AB1045"
+                        />
+                      </label>
+
+                      <label>
+                        Parking pass token
+                        <input
+                          value={gatePassToken}
+                          onChange={e => setGatePassToken(e.target.value)}
+                          placeholder="Enter token from customer parking QR"
                         />
                       </label>
 
