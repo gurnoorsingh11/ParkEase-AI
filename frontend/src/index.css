@@ -1878,3 +1878,51 @@ footer span:last-child {
     font-size: 8px;
   }
 }
+
+
+/* Digital booking QR panels */
+.booking-qr-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  min-width: 260px;
+  max-width: 520px;
+  padding: 14px;
+  margin-top: 10px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 14px;
+  background: var(--surface, #fff);
+}
+.booking-qr-item {
+  display: flex;
+  flex: 1 1 150px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  min-width: 130px;
+}
+.booking-qr-item img {
+  width: 144px;
+  height: 144px;
+  padding: 7px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  object-fit: contain;
+}
+.booking-qr-item small, .booking-qr-note {
+  max-width: 190px;
+  color: var(--muted, #64748b);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.booking-qr-item a {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent, #2563eb);
+}
+.booking-qr-note {
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--surface-secondary, #f8fafc);
+}
