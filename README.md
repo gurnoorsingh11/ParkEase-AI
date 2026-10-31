@@ -41,3 +41,20 @@ For a live deployment, configure `UPI_ID` and `PAYMENT_MODE` in the backend serv
 ## Important demo limitations
 
 The seeded users and role switch are demo-only, not authentication. The app includes simulated slot sensors, gate actions, and video digitisation. SQLite may not persist on ephemeral hosting filesystems.
+
+
+## QR pass and UPI demo configuration
+
+The customer **My bookings** page can generate a digital parking-pass QR for confirmed and active bookings. The operator **Gate control** page can scan the QR with a supported browser camera, or accept the pass token manually. Camera access requires HTTPS (or localhost) and a browser that supports the BarcodeDetector API. The existing booking-reference/number-plate flow remains available as a demo fallback.
+
+Set `UPI_ID` in the backend environment to enable a dynamic UPI intent QR with the booking amount and reference. The QR only pre-fills a payment in a UPI app; it does **not** prove that money was received. Do not mark a transaction paid based on a scan or a client-side redirect. A production payment flow needs a verified payment gateway/webhook or a manual reconciliation process.
+
+Example backend environment:
+
+```env
+UPI_ID=isahibsasan@oksbi
+```
+
+Install backend dependencies with `pip install -r backend/requirements.txt`; the QR image generator uses `qrcode[pil]`.
+
+**Demo/security note:** the current application has no authenticated customer/operator sessions. The booking QR token is random and validated by the backend, but the surrounding demo API still needs real authentication and role-based authorization before production use. The QR/payment feature is additive and does not introduce a payment gateway.
