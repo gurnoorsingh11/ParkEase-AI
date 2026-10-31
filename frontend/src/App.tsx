@@ -1,8 +1,10 @@
 
 import React, { useEffect, useState } from 'react'
+import Analytics from './Analytics'
+
 import {
   Activity, ArrowDownRight, ArrowUpRight, ArrowUpRightFromSquare,
-  Bike, Building2, CarFront, Check, ChevronDown, CircleHelp,
+  BarChart3, Bike, Building2, CarFront, Check, ChevronDown, CircleHelp,
   Clock3, Gauge, LayoutDashboard, LogOut, MapPin, ParkingCircle,
   RefreshCw, ScanLine, Search, ShieldCheck, SlidersHorizontal,
   Sparkles, Ticket, Users, Wallet, X
@@ -156,6 +158,7 @@ export default function App() {
         { label: 'Facilities & slots', icon: Building2 },
         { label: 'Gate control', icon: ScanLine },
         { label: 'Bookings', icon: Ticket },
+        { label: 'Analytics', icon: BarChart3 },
         { label: 'Activity', icon: Activity }
       ]
 
@@ -1011,6 +1014,16 @@ export default function App() {
                     </div>
                   </div>
                 </section>
+              )}
+
+              {page === 'Analytics' && role === 'OPERATOR' && (
+                <Analytics
+                  bookings={bookings}
+                  payments={payments}
+                  slots={slots}
+                  facilities={facilities}
+                  sessions={data.sessions || []}
+                />
               )}
 
               {page === 'Activity' && (
