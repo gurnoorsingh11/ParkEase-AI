@@ -4,6 +4,7 @@ import json
 import base64
 import io
 import secrets
+import hashlib
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Header
@@ -173,7 +174,7 @@ class ParkingPass(Base):
     __tablename__ = "parking_passes"
     id = Column(String, primary_key=True)
     booking_id = Column(String, ForeignKey("bookings.id"), unique=True, nullable=False, index=True)
-    token = Column(String, unique=True, nullable=False, index=True)
+    token_hash = Column(String, unique=True, nullable=False, index=True)
     active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -547,23 +548,27 @@ def get_booking_qrs(booking_id: str, customer_id: str, db: Session = Depends(get
     if parking_pass and not parking_pass.active:
         raise HTTPException(status_code=400, detail="This parking pass has already been used or deactivated.")
 
+    # Store only a SHA-256 digest. The one-time raw bearer token is returned to the customer.
+    pass_token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(pass_token.encode("utf-8")).hexdigest()
     if not parking_pass:
         parking_pass = ParkingPass(
             id=f"pass-{uuid.uuid4().hex[:10]}",
             booking_id=booking.id,
-            token=secrets.token_urlsafe(32),
+            token_hash=token_hash,
             active=True
         )
         db.add(parking_pass)
-        db.commit()
-        db.refresh(parking_pass)
+    else:
+        parking_pass.token_hash = token_hash
+    db.commit()
 
-    parking_payload = f"PARKEASE|PASS|{booking.booking_ref}|{parking_pass.token}"
+    parking_payload = f"PARKEASE|PASS|{booking.booking_ref}|{pass_token}"
     result = {
         "booking_id": booking.id,
         "booking_ref": booking.booking_ref,
         "parking_qr_data": create_qr_data_uri(parking_payload),
-        "pass_token": parking_pass.token,
+        "pass_token": pass_token,
         "payment_qr_data": None,
         "upi_uri": None,
         "payment_status": booking.payment_status,
@@ -592,11 +597,13 @@ def smart_gate_entry(req: GateEntryRequest, db: Session = Depends(get_db)):
     booking = db.query(Booking).filter(Booking.booking_ref == req.booking_ref).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Invalid QR / Booking Reference.")
+    supplied_hash = hashlib.sha256((req.pass_token or "").encode("utf-8")).hexdigest()
     supplied_pass = db.query(ParkingPass).filter(
         ParkingPass.booking_id == booking.id,
+        ParkingPass.token_hash == supplied_hash,
         ParkingPass.active == True
     ).first()
-    if not supplied_pass or not req.pass_token or supplied_pass.token != req.pass_token:
+    if not supplied_pass or not req.pass_token:
         raise HTTPException(status_code=403, detail="A valid, active ParkEase parking-pass QR is required.")
     if booking.payment_mode == "PREPAID" and booking.payment_status != "PAID":
         raise HTTPException(status_code=402, detail="Payment must be verified before entry.")
