@@ -47,6 +47,7 @@ async function api(path: string, options: RequestInit = {}) {
 export default function App() {
   const [role, setRole] = useState<'CUSTOMER' | 'OPERATOR'>('CUSTOMER')
   const [page, setPage] = useState('Overview')
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
 
   const [data, setData] = useState<AnyObj>({
     users: [],
@@ -360,23 +361,81 @@ export default function App() {
             </button>
           </div>
 
-          <div className="profile">
-            <div className="avatar">
-              {role === 'CUSTOMER' ? 'AS' : 'VS'}
-            </div>
-            <div className="profile-copy">
-              <b>
-                {role === 'CUSTOMER'
-                  ? customer?.name || 'Aarav Sharma'
-                  : operator?.name || 'Parking Operator'}
-              </b>
-              <small>
-                {role === 'CUSTOMER'
-                  ? 'Customer account'
-                  : 'Operator workspace'}
-              </small>
-            </div>
-            <ChevronDown size={16} />
+          <div className="profile-menu-wrap">
+            <button
+              type="button"
+              className={`profile profile-trigger ${profileMenuOpen ? 'open' : ''}`}
+              onClick={() => setProfileMenuOpen(open => !open)}
+              aria-haspopup="menu"
+              aria-expanded={profileMenuOpen}
+              aria-label="Open profile menu"
+            >
+              <span className="avatar">
+                {role === 'CUSTOMER' ? 'AS' : 'VS'}
+              </span>
+              <span className="profile-copy">
+                <b>
+                  {role === 'CUSTOMER'
+                    ? customer?.name || 'Aarav Sharma'
+                    : operator?.name || 'Parking Operator'}
+                </b>
+                <small>
+                  {role === 'CUSTOMER'
+                    ? 'Customer account'
+                    : 'Operator workspace'}
+                </small>
+              </span>
+              <ChevronDown className={profileMenuOpen ? 'profile-chevron rotated' : 'profile-chevron'} size={16} />
+            </button>
+
+            {profileMenuOpen && (
+              <div className="profile-dropdown" role="menu">
+                <div className="profile-dropdown-heading">
+                  <span className="profile-dropdown-label">SIGNED IN AS</span>
+                  <b>
+                    {role === 'CUSTOMER'
+                      ? customer?.name || 'Aarav Sharma'
+                      : operator?.name || 'Parking Operator'}
+                  </b>
+                  <small>{role === 'CUSTOMER' ? 'Customer account' : 'Operator workspace'}</small>
+                </div>
+                <div className="profile-dropdown-divider" />
+                <button
+                  type="button"
+                  className="profile-menu-item"
+                  role="menuitem"
+                  onClick={() => {
+                    setRole(role === 'CUSTOMER' ? 'OPERATOR' : 'CUSTOMER')
+                    setPage('Overview')
+                    setProfileMenuOpen(false)
+                  }}
+                >
+                  <span className="profile-menu-item-icon"><Users size={15} /></span>
+                  <span>
+                    <b>Switch workspace</b>
+                    <small>Switch to {role === 'CUSTOMER' ? 'Operator' : 'Customer'}</small>
+                  </span>
+                  <ArrowUpRight size={14} />
+                </button>
+                <button
+                  type="button"
+                  className="profile-menu-item"
+                  role="menuitem"
+                  onClick={() => {
+                    setNotice('ParkEase AI is running in demo mode. Payments, sensors and gate actions are simulated.')
+                    setProfileMenuOpen(false)
+                  }}
+                >
+                  <span className="profile-menu-item-icon"><CircleHelp size={15} /></span>
+                  <span>
+                    <b>Help & demo info</b>
+                    <small>Learn about this workspace</small>
+                  </span>
+                  <ArrowUpRight size={14} />
+                </button>
+                <div className="profile-dropdown-footer">ParkEase AI · Demo account</div>
+              </div>
+            )}
           </div>
         </div>
       </aside>
