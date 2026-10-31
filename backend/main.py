@@ -1,6 +1,9 @@
 import os
 import uuid
 import json
+import base64
+import io
+import secrets
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Header
@@ -164,6 +167,14 @@ class Payment(Base):
     amount = Column(Float, nullable=False)
     method = Column(String, nullable=False)
     status = Column(String, default="SUCCESS")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class ParkingPass(Base):
+    __tablename__ = "parking_passes"
+    id = Column(String, primary_key=True)
+    booking_id = Column(String, ForeignKey("bookings.id"), unique=True, nullable=False, index=True)
+    token = Column(String, unique=True, nullable=False, index=True)
+    active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class AuditLog(Base):
@@ -382,6 +393,7 @@ class ConfirmBookingRequest(BaseModel):
 class GateEntryRequest(BaseModel):
     booking_ref: str
     presented_plate: str
+    pass_token: Optional[str] = None
     operator_override: bool = False
     override_note: Optional[str] = None
 
@@ -510,11 +522,78 @@ def confirm_booking(req: ConfirmBookingRequest, db: Session = Depends(get_db)):
     db.commit()
     return {"booking": booking}
 
+
+def create_qr_data_uri(payload: str) -> str:
+    import qrcode
+    image = qrcode.make(payload)
+    output = io.BytesIO()
+    image.save(output, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(output.getvalue()).decode("ascii")
+
+@app.get("/api/bookings/{booking_id}/qrs")
+def get_booking_qrs(booking_id: str, customer_id: str, db: Session = Depends(get_db)):
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found.")
+    if booking.customer_id != customer_id:
+        raise HTTPException(status_code=403, detail="This booking does not belong to the requested customer.")
+    if booking.status not in ["CONFIRMED", "ACTIVE_SESSION", "COMPLETED"]:
+        raise HTTPException(status_code=400, detail="A parking pass is available only for a confirmed booking.")
+
+    parking_pass = db.query(ParkingPass).filter(ParkingPass.booking_id == booking.id).first()
+    if not parking_pass:
+        parking_pass = ParkingPass(
+            id=f"pass-{uuid.uuid4().hex[:10]}",
+            booking_id=booking.id,
+            token=secrets.token_urlsafe(32),
+            active=True
+        )
+        db.add(parking_pass)
+        db.commit()
+        db.refresh(parking_pass)
+
+    parking_payload = f"PARKEASE|PASS|{parking_pass.token}"
+    result = {
+        "booking_id": booking.id,
+        "booking_ref": booking.booking_ref,
+        "parking_qr_data": create_qr_data_uri(parking_payload),
+        "pass_token": parking_pass.token,
+        "payment_qr_data": None,
+        "upi_uri": None,
+        "payment_status": booking.payment_status,
+        "amount": booking.total_amount,
+        "payment_note": "Payment is not verified by scanning a QR code."
+    }
+
+    upi_id = os.getenv("UPI_ID", "").strip()
+    if booking.payment_status != "PAID" and upi_id:
+        from urllib.parse import quote
+        payee_name = quote("ParkEase")
+        transaction_note = quote(f"Parking {booking.booking_ref}")
+        upi_uri = (
+            f"upi://pay?pa={quote(upi_id)}&pn={payee_name}"
+            f"&am={booking.total_amount:.2f}&cu=INR&tn={transaction_note}"
+        )
+        result["upi_uri"] = upi_uri
+        result["payment_qr_data"] = create_qr_data_uri(upi_uri)
+    elif booking.payment_status != "PAID":
+        result["payment_note"] = "Set the UPI_ID environment variable on the backend to enable the payment QR. Payment verification remains manual until a gateway integration is configured."
+
+    return result
+
 @app.post("/api/sessions/entry")
 def smart_gate_entry(req: GateEntryRequest, db: Session = Depends(get_db)):
     booking = db.query(Booking).filter(Booking.booking_ref == req.booking_ref).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Invalid QR / Booking Reference.")
+    if req.pass_token:
+        supplied_pass = db.query(ParkingPass).filter(
+            ParkingPass.booking_id == booking.id,
+            ParkingPass.token == req.pass_token,
+            ParkingPass.active == True
+        ).first()
+        if not supplied_pass:
+            raise HTTPException(status_code=403, detail="Invalid or inactive parking pass QR.")
     if booking.status == "ACTIVE_SESSION":
         raise HTTPException(status_code=400, detail="Duplicate Entry Rejected: An active session already exists for this pass.")
     if booking.status != "CONFIRMED":
@@ -583,6 +662,9 @@ def smart_gate_exit(req: GateExitRequest, db: Session = Depends(get_db)):
     session.final_charge = booking.total_amount
     session.status = "CLOSED"
     booking.status = "COMPLETED"
+    parking_pass = db.query(ParkingPass).filter(ParkingPass.booking_id == booking.id).first()
+    if parking_pass:
+        parking_pass.active = False
 
     slot.status = "AVAILABLE"
     slot.last_updated = datetime.utcnow()
