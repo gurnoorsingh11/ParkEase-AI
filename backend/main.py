@@ -402,6 +402,11 @@ class GateExitRequest(BaseModel):
     booking_ref: str
     payment_method: str = "SIMULATED_UPI"
 
+class ManualPaymentVerifyRequest(BaseModel):
+    booking_ref: str
+    transaction_reference: str
+    operator_note: Optional[str] = None
+
 class SlotUpdateRequest(BaseModel):
     code: Optional[str] = None
     slot_type: Optional[str] = None
@@ -592,6 +597,45 @@ def get_booking_qrs(booking_id: str, customer_id: str, db: Session = Depends(get
 
     return result
 
+
+@app.post("/api/payments/manual-verify")
+def manual_verify_payment(req: ManualPaymentVerifyRequest, db: Session = Depends(get_db)):
+    booking = db.query(Booking).filter(Booking.booking_ref == req.booking_ref.strip()).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found.")
+    if booking.payment_status == "PAID":
+        raise HTTPException(status_code=409, detail="This booking is already marked as paid.")
+
+    transaction_reference = req.transaction_reference.strip().upper()
+    if len(transaction_reference) < 6 or len(transaction_reference) > 80:
+        raise HTTPException(status_code=400, detail="Enter a valid UPI transaction reference (6–80 characters).")
+
+    reference_hash = hashlib.sha256(transaction_reference.encode("utf-8")).hexdigest()
+    idempotency_key = f"upi-utr-{reference_hash}"
+    duplicate = db.query(Payment).filter(Payment.idempotency_key == idempotency_key).first()
+    if duplicate:
+        raise HTTPException(status_code=409, detail="This UPI transaction reference has already been used.")
+
+    payment = Payment(
+        id=f"pay-{uuid.uuid4().hex[:8]}",
+        booking_id=booking.id,
+        idempotency_key=idempotency_key,
+        amount=booking.total_amount,
+        method="UPI_MANUAL",
+        status="SUCCESS"
+    )
+    booking.payment_status = "PAID"
+    db.add(payment)
+    db.add(AuditLog(
+        id=f"aud-{uuid.uuid4().hex[:8]}",
+        facility_id=booking.facility_id,
+        actor_role="OPERATOR_MANUAL_PAYMENT_VERIFY",
+        action="UPI_PAYMENT_MANUALLY_VERIFIED",
+        details=f"Booking {booking.booking_ref} verified against UPI reference {transaction_reference}. {req.operator_note or ''}".strip()
+    ))
+    db.commit()
+    return {"booking": booking, "payment": payment, "message": "Payment marked paid after manual operator verification."}
+
 @app.post("/api/sessions/entry")
 def smart_gate_entry(req: GateEntryRequest, db: Session = Depends(get_db)):
     booking = db.query(Booking).filter(Booking.booking_ref == req.booking_ref).first()
@@ -658,6 +702,9 @@ def smart_gate_exit(req: GateExitRequest, db: Session = Depends(get_db)):
         ParkingSession.status == "ACTIVE"
     ).first()
     slot = db.query(ParkingSlot).filter(ParkingSlot.id == booking.slot_id).first()
+
+    if booking.payment_mode == "PREPAID" and booking.payment_status != "PAID":
+        raise HTTPException(status_code=402, detail="Prepaid booking must be verified as paid before exit.")
 
     if booking.payment_status != "PAID":
         payment = Payment(
