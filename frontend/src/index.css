@@ -254,6 +254,149 @@ nav {
   margin-top: 4px;
 }
 
+.profile-menu-wrap {
+  position: relative;
+  margin-top: 13px;
+  border-top: 1px solid #edf0ed;
+}
+
+.profile-trigger {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-top: 0;
+  padding: 13px 3px 2px;
+  border-radius: 10px;
+  transition: background 160ms ease;
+}
+
+.profile-trigger:hover,
+.profile-trigger.open {
+  background: #f4f8f5;
+}
+
+.profile-trigger:focus-visible,
+.profile-menu-item:focus-visible {
+  outline: 2px solid #4d9b70;
+  outline-offset: 2px;
+}
+
+.profile-chevron {
+  flex: 0 0 auto;
+  color: #849087;
+  transition: transform 160ms ease;
+}
+
+.profile-chevron.rotated {
+  transform: rotate(180deg);
+}
+
+.profile-dropdown {
+  position: absolute;
+  z-index: 30;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  padding: 10px;
+  background: #fff;
+  border: 1px solid #e5ece7;
+  border-radius: 14px;
+  box-shadow: 0 16px 38px rgba(22, 49, 33, 0.14);
+}
+
+.profile-dropdown-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 7px 8px 10px;
+  min-width: 0;
+}
+
+.profile-dropdown-label {
+  color: #8b978e;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .1em;
+}
+
+.profile-dropdown-heading b {
+  color: #263b2d;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-dropdown-heading small {
+  color: #87948b;
+  font-size: 10px;
+}
+
+.profile-dropdown-divider {
+  height: 1px;
+  background: #edf1ee;
+  margin: 0 4px 6px;
+}
+
+.profile-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 7px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #34483a;
+  text-align: left;
+  cursor: pointer;
+}
+
+.profile-menu-item:hover {
+  background: #f4f8f5;
+}
+
+.profile-menu-item > span:nth-child(2) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.profile-menu-item b {
+  font-size: 11px;
+}
+
+.profile-menu-item small {
+  color: #87948b;
+  font-size: 9px;
+}
+
+.profile-menu-item > svg {
+  color: #91a097;
+}
+
+.profile-menu-item-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  background: #edf5ef;
+  color: #28744b;
+}
+
+.profile-dropdown-footer {
+  padding: 9px 8px 3px;
+  color: #9aa49d;
+  font-size: 9px;
+}
+
 .main-area {
   min-width: 0;
   flex: 1;
